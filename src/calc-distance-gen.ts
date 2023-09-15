@@ -1,7 +1,12 @@
 import * as readline from "readline";
 import * as fs from "node:fs/promises";
-import { compareList, sheetToPattern } from "./calc-distance-util";
+import {
+  compareList,
+  patternToSheet,
+  sheetToPattern,
+} from "./calc-distance-util";
 import { calcDistance } from "./calc-distance";
+import { readFile } from "fs";
 
 // decompose the input to a sum af a list of number
 const generateCount = (input: number, maxCount: number) => {
@@ -55,10 +60,43 @@ const pushNewGap = (prevList: number[][], type: number) => {
 };
 
 // return the map of all result, key is pattern and value is distance
-const generateResultMap = (len: number, useShortCut = false) => {
-  let sum = 0;
+
+const generateResultMap = (
+  list: string[],
+  tempMap: Map<string, number>,
+  calcNumber = 10000
+) => {
+  let sum = tempMap.size;
   const startTime = new Date().getTime();
-  const total = 1292059;
+  const total = list.length;
+  const map: Map<string, number> = new Map(tempMap);
+  const endIndex = Math.min(tempMap.size + calcNumber, list.length);
+  for (let i = tempMap.size; i < endIndex; i++) {
+    const pattern = list[i];
+    const sheet: number[][] = patternToSheet(pattern);
+    if (!map.has(pattern)) {
+      sum++;
+      map.set(pattern, calcDistance(sheet));
+    }
+    if (sum % 1000 === 0) {
+      const text = `\r\x1b[K${sum}/${total} ${((sum / total) * 100).toFixed(
+        4
+      )}% total:${(new Date().getTime() - startTime) / 1000}s`;
+      readline.clearLine(process.stdout, 0);
+      readline.cursorTo(process.stdout, 0);
+      process.stdout.write(text);
+    }
+  }
+  console.log(
+    `\n${sum - tempMap.size}generated ${
+      (new Date().getTime() - startTime) / 1000
+    }s`
+  );
+  return map;
+};
+
+const generateResultSet = (len: number) => {
+  console.log("generating");
   // { patternSum: 1292059, calcSum: 1058213 }
   const allSmallerCount = [];
   let curr = 2;
@@ -69,7 +107,7 @@ const generateResultMap = (len: number, useShortCut = false) => {
   const countSheet = generateCount(len, 4);
   const countLists = allSmallerCount.map((e) => countSheet[e]).flat();
   const gapSheet = generateGap(len - 1, 3);
-  const map = new Map<string, number>();
+  const set = new Set<string>();
   countLists.forEach((countList, _index) => {
     const gapLists = gapSheet[countList.length - 1];
     gapLists.forEach((gapList) => {
@@ -97,106 +135,55 @@ const generateResultMap = (len: number, useShortCut = false) => {
         true
       ); // if the list longer than 9, not a correct list
       const pattern = sheetToPattern(result);
-      if (isMoreThanMax && !map.has(pattern)) {
-        sum++;
-        if (useShortCut) {
-          const simplified = simplifySheet(result);
-          const simplifiedPattern = sheetToPattern(simplified.sheet);
-          const simplifiedDistance = map.get(simplifiedPattern);
-          if (simplifiedDistance !== undefined) {
-            map.set(pattern, simplifiedDistance + simplified.addDistance);
-          } else {
-            map.set(pattern, calcDistance(result));
-          }
-        } else {
-          map.set(pattern, calcDistance(result));
-        }
-      }
-      if (sum % 1000 === 0) {
-        const text = `\r\x1b[K${sum}/${total} ${((sum / total) * 100).toFixed(
-          4
-        )}% total:${(new Date().getTime() - startTime) / 1000}s`;
-        readline.clearLine(process.stdout, 0);
-        readline.cursorTo(process.stdout, 0);
-        process.stdout.write(text);
+      if (isMoreThanMax && !set.has(pattern)) {
+        set.add(pattern);
       }
     });
   });
-  console.log(
-    `\ncount:${map.size} time:${(new Date().getTime() - startTime) / 1000}s`
-  );
-  return map;
+  console.log(`generated total:${set.size}`);
+  return set;
 };
 
-const SAMPLE_LIST = [
-  [1],
-  [1, 0, 1],
-  [1, 1, 0, 1],
-  [1, 0, 1, 1],
-  [1, 1, 1],
-  [1, 1, 1, 1, 1, 1],
-  [1, 1, 1, 1, 1, 1, 1, 1, 1],
-];
-
-const removeListFromSheet = (sheet: number[][], listToRemove: number[]) => {
-  const removeIndex = sheet.findLastIndex(
-    (e) => compareList(e, listToRemove) === 0
-  );
-  if (removeIndex !== -1) {
-    sheet.splice(removeIndex, 1);
-    return sheet;
-  } else {
-    return sheet;
-  }
-};
-
-const simplifySheet: (sheet: number[][]) => {
-  sheet: number[][];
-  addDistance: number;
-} = (sheet: number[][]) => {
-  const record = new Array(SAMPLE_LIST.length).fill(0);
-  sheet.forEach((list) => {
-    SAMPLE_LIST.forEach((sample, index) => {
-      if (compareList(list, sample) === 0) {
-        record[index]++;
-      }
-    });
-  });
-  let newSheet = sheet;
-  let addDistance = 0;
-  if (record[0] >= 3) {
-    newSheet = removeListFromSheet(newSheet, SAMPLE_LIST[0]);
-    newSheet = removeListFromSheet(newSheet, SAMPLE_LIST[0]);
-    newSheet = removeListFromSheet(newSheet, SAMPLE_LIST[0]);
-    addDistance = 2;
-  } else if (record[0] >= 1 && record[1] >= 1) {
-    newSheet = removeListFromSheet(newSheet, SAMPLE_LIST[0]);
-    newSheet = removeListFromSheet(newSheet, SAMPLE_LIST[1]);
-    addDistance = 1;
-  } else if (record[2] >= 1 || record[3] >= 1) {
-    newSheet = removeListFromSheet(newSheet, SAMPLE_LIST[2]);
-    newSheet = removeListFromSheet(newSheet, SAMPLE_LIST[3]);
-    addDistance = 1;
-  } else if (record[4] >= 1 || record[5] >= 1 || record[6] >= 1) {
-    newSheet = removeListFromSheet(newSheet, SAMPLE_LIST[4]);
-    newSheet = removeListFromSheet(newSheet, SAMPLE_LIST[5]);
-    newSheet = removeListFromSheet(newSheet, SAMPLE_LIST[6]);
-    addDistance = 0;
-  }
-  return { sheet: newSheet, addDistance };
-};
-
-export const writeToFile = async () => {
+export const writeSetToFile = async () => {
   // 87864ms
   // 100176ms
-  const useShortCut = true;
-  const len = 14;
-  const resultMap = generateResultMap(len, useShortCut);
+
   try {
     await fs.mkdir("./output");
   } catch {}
-  await fs.writeFile(
-    `./output/data${useShortCut ? "-short" : ""}-${len}.txt`,
-    [...resultMap.entries()].map((e) => `${e[0]}>${e[1]}`).join("\n")
-  );
+  try {
+    await fs.access(`./output/${len}-list.txt`);
+  } catch {
+    const resultSet = generateResultSet(len);
+    await fs.writeFile(`./output/${len}-list.txt`, [...resultSet].join("\n"));
+  }
 };
+
+export const readTempAndSet = async () => {
+  let list: string[] = [];
+  const map: Map<string, number> = new Map();
+  try {
+    list = (await fs.readFile(`./output/${len}-list.txt`))
+      .toString()
+      .split("\n");
+    const mapList = (await fs.readFile(`./output/${len}-temp.txt`))
+      .toString()
+      .split("\n");
+
+    mapList.forEach((e) => {
+      const [pattern, distance] = e.split(">");
+      map.set(pattern, parseInt(distance));
+    });
+  } catch {}
+
+  console.log(`total:${list.length} done:${map.size}`);
+  const resultMap = generateResultMap(list, map, 1000000);
+  if (resultMap.size) {
+    await fs.writeFile(
+      `./output/${len}-temp.txt`,
+      [...resultMap.entries()].map((e) => `${e[0]}>${e[1]}`).join("\n")
+    );
+  }
+};
+
+const len = 11;

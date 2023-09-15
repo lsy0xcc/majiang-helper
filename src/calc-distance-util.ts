@@ -25,3 +25,12 @@ export const compareList = (a: number[], b: number[]) => {
     return 0;
   }
 };
+
+export const patternToSheet = (pattern: string) => {
+  return pattern.split(" ").map((e) =>
+    e
+      .replaceAll(";", ",0,")
+      .split(",")
+      .map((char) => parseInt(char))
+  );
+};
