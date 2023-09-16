@@ -1,12 +1,6 @@
-import * as readline from "readline";
 import * as fs from "node:fs/promises";
-import {
-  compareList,
-  patternToSheet,
-  sheetToPattern,
-} from "./calc-distance-util";
-import { calcDistance } from "./calc-distance";
-import { readFile } from "fs";
+import { Worker } from "worker_threads";
+import { sheetToPattern } from "./calc-distance-util";
 
 // decompose the input to a sum af a list of number
 const generateCount = (input: number, maxCount: number) => {
@@ -61,38 +55,25 @@ const pushNewGap = (prevList: number[][], type: number) => {
 
 // return the map of all result, key is pattern and value is distance
 
-const generateResultMap = (
-  list: string[],
-  tempMap: Map<string, number>,
-  calcNumber = 10000
-) => {
-  let sum = tempMap.size;
+const generateResultMap = async (list: string[], processNo = 8) => {
   const startTime = new Date().getTime();
-  const total = list.length;
-  const map: Map<string, number> = new Map(tempMap);
-  const endIndex = Math.min(tempMap.size + calcNumber, list.length);
-  for (let i = tempMap.size; i < endIndex; i++) {
-    const pattern = list[i];
-    const sheet: number[][] = patternToSheet(pattern);
-    if (!map.has(pattern)) {
-      sum++;
-      map.set(pattern, calcDistance(sheet));
-    }
-    if (sum % 1000 === 0) {
-      const text = `\r\x1b[K${sum}/${total} ${((sum / total) * 100).toFixed(
-        4
-      )}% total:${(new Date().getTime() - startTime) / 1000}s`;
-      readline.clearLine(process.stdout, 0);
-      readline.cursorTo(process.stdout, 0);
-      process.stdout.write(text);
-    }
-  }
+  // const total = list.length;
+  const oneWorkerLen = Math.ceil(list.length / processNo);
+  const workerResult = await Promise.all(
+    [...new Array(processNo).keys()].map((e) =>
+      runWorker({
+        data: list.slice(e * oneWorkerLen, (e + 1) * oneWorkerLen),
+        workerNo: e,
+      })
+    )
+  );
+  const resultArray = workerResult.flat();
   console.log(
-    `\n${sum - tempMap.size}generated ${
+    `\n${resultArray.length}generated in ${
       (new Date().getTime() - startTime) / 1000
     }s`
   );
-  return map;
+  return resultArray.join("\n");
 };
 
 const generateResultSet = (len: number) => {
@@ -140,7 +121,7 @@ const generateResultSet = (len: number) => {
       }
     });
   });
-  console.log(`generated total:${set.size}`);
+  console.log(`generated total:${set.size}\n`);
   return set;
 };
 
@@ -159,31 +140,46 @@ export const writeSetToFile = async () => {
   }
 };
 
-export const readTempAndSet = async () => {
+export const readSet = async () => {
+  const start = new Date();
   let list: string[] = [];
-  const map: Map<string, number> = new Map();
   try {
     list = (await fs.readFile(`./output/${len}-list.txt`))
       .toString()
       .split("\n");
-    const mapList = (await fs.readFile(`./output/${len}-temp.txt`))
-      .toString()
-      .split("\n");
-
-    mapList.forEach((e) => {
-      const [pattern, distance] = e.split(">");
-      map.set(pattern, parseInt(distance));
-    });
   } catch {}
 
-  console.log(`total:${list.length} done:${map.size}`);
-  const resultMap = generateResultMap(list, map, 1000000);
-  if (resultMap.size) {
-    await fs.writeFile(
-      `./output/${len}-temp.txt`,
-      [...resultMap.entries()].map((e) => `${e[0]}>${e[1]}`).join("\n")
-    );
-  }
+  process.stdout.write(
+    `total:${list.length} ${
+      (new Date().getTime() - start.getTime()) / 1000
+    }s used`
+  );
+  const result = await generateResultMap(list);
+
+  await fs.writeFile(`./output/${len}-data.txt`, result);
 };
 
-const len = 11;
+const runWorker = async (workerData: { data: string[]; workerNo: number }) => {
+  return new Promise<string[]>((resolve, reject) => {
+    console.log(`worker#${workerData.workerNo} will start soon`);
+    const worker = new Worker("./dist/calc-distance-worker.js", {
+      workerData,
+    });
+    worker.on("message", (message) => {
+      if (message.type === "success") {
+        resolve(message.data);
+      } else {
+        console.log(message.data);
+        // readline.clearLine(process.stdout, 0);
+        // readline.cursorTo(process.stdout, 0);
+        // process.stdout.write(message.data);
+      }
+    });
+    worker.on("error", reject);
+    worker.on("exit", (code) => {
+      if (code !== 0) reject(new Error(`stopped with  ${code} exit code`));
+    });
+  });
+};
+
+const len = 14;
