@@ -1,8 +1,8 @@
-import { readTempAndSet, writeSetToFile } from "./calc-distance-gen";
+import { writeDataToFile, writeSetToFile } from "./calc-distance-gen";
 
 const run = async () => {
   await writeSetToFile();
-  await readTempAndSet();
+  await writeDataToFile();
 };
 
 run();

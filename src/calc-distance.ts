@@ -1,3 +1,5 @@
+import { listToSheet } from "./calc-distance-util";
+
 interface Record {
   sheet: number[][];
   k: number;
@@ -10,66 +12,10 @@ interface Record {
 
 const clone2DArray = (input: number[][]) => input.map((e) => [...e]);
 // if a list has two adjacent 0s，split the array from there
-const listToSheet = (input: number[]) => {
-  const result = [];
-  let tempArray = [];
-  for (let i = 0; i < input.length; i++) {
-    if (input[i]) {
-      tempArray.push(input[i]);
-    } else {
-      if (input[i + 1] && tempArray.length) {
-        tempArray.push(input[i]);
-      } else {
-        if (tempArray.length) {
-          result.push(tempArray);
-          tempArray = [];
-        }
-      }
-    }
-  }
-  if (tempArray.length) {
-    result.push(tempArray);
-  }
-  return result;
-};
+
 // for a 2D array, process every list, and flat them to keep shape as before
 const processSheet = (input: number[][]) => input.map(listToSheet).flat();
-// convert an input string
-const inputToSheet = (input: string) => {
-  // [1m, ..., 9m, 0, 0, 1s, ..., 9s, 0, 0, 1p, ..., 9p, 0, 0, 1z, 0, 0, 2z, ...]
-  const result = new Array(52).fill(0);
-  if (input.match(/(\d+[mpsz])+/)) {
-    [...input.matchAll(/\d+[mpsz]/g)]
-      .map((e) => e[0]) // split mpsz type
-      .forEach((e) => {
-        const list = e.split("");
-        const type = list.pop(); // get type
-        list
-          .map((e) => parseInt(e === "0" ? "5" : e)) // convert red 5
-          .forEach((e) => {
-            switch (type) {
-              case "m":
-                result[e - 1]++;
-                break;
-              case "s":
-                result[e + 10]++;
-                break;
-              case "p":
-                result[e + 21]++;
-                break;
-              case "z":
-                result[3 * (e + 10)]++;
-            }
-          });
-      });
-    if (
-      result.length <= 52 && // prevent 8z 9z
-      result.reduce((prev, curr) => prev && curr <= 4, true) // prevent more than 4 tiles
-    ) {
-      return listToSheet(result);
-    }
-  }
-};
+
 // the wrapper function
 export const calcDistance = (sheet?: number[][]) => {
   if (!sheet?.length) {
@@ -228,7 +174,3 @@ const minusQ = (input: Record) => {
   });
   return result;
 };
-
-// const test = () => {
-//   console.log(calcDistance(inputToSheet("11122233344455m")));
-// };

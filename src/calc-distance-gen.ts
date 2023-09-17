@@ -140,7 +140,7 @@ export const writeSetToFile = async () => {
   }
 };
 
-export const readSet = async () => {
+export const writeDataToFile = async () => {
   const start = new Date();
   let list: string[] = [];
   try {
