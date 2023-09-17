@@ -1,8 +1,11 @@
-import { writeDataToFile, writeSetToFile } from "./calc-distance-gen";
+import {
+  generateBinFile,
+  writeDataToFile,
+  writeSetToFile,
+} from "./calc-distance-gen";
 
 const run = async () => {
-  await writeSetToFile();
-  await writeDataToFile();
+  await generateBinFile();
 };
 
 run();

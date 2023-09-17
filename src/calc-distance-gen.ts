@@ -1,6 +1,7 @@
 import * as fs from "node:fs/promises";
 import { Worker } from "worker_threads";
 import { sheetToPattern } from "./calc-distance-util";
+import pako from "pako";
 
 // decompose the input to a sum af a list of number
 const generateCount = (input: number, maxCount: number) => {
@@ -183,3 +184,73 @@ const runWorker = async (workerData: { data: string[]; workerNo: number }) => {
 };
 
 const len = 14;
+
+export const generateBinFile = async () => {
+  try {
+    await fs.mkdir("./bin");
+  } catch {}
+  try {
+    await fs.access(`./output/${len}-data.txt`);
+    const textResult = await fs.readFile(`./output/${len}-data.txt`);
+    const resultMap: string[][] = [];
+    for (let i = 0; i <= 9; i++) {
+      resultMap[i] = [];
+    }
+
+    // sort the list  by diatance
+    textResult
+      .toString()
+      .split("\n")
+      .forEach((record) => {
+        const [pattern, distance] = record.split(">");
+        const distanceIndex = parseInt(distance);
+        resultMap[distanceIndex].push(pattern);
+      });
+
+    // convert the result
+    const resultArray: number[] = [];
+    resultMap.forEach((group) => {
+      group.forEach((pattern) => {
+        pattern.split("").forEach((char) => {
+          switch (char) {
+            case "1":
+            case ",":
+              resultArray.push(0);
+              break;
+            case "2":
+            case ";":
+              resultArray.push(1);
+              break;
+            case "3":
+            case " ":
+              resultArray.push(2);
+              break;
+            case "4":
+              resultArray.push(3);
+              break;
+          }
+        });
+        resultArray.push(3);
+      });
+    });
+    const u8Result: number[] = [];
+    const u8Length = resultArray.length / 4;
+    for (let i = 0; i < u8Length; i++) {
+      u8Result.push(
+        (resultArray[i] << 6) |
+          (resultArray[i + 1] << 4) |
+          (resultArray[i + 2] << 2) |
+          resultArray[i + 3]
+      );
+    }
+
+    const compressed = pako.deflate(new Uint8Array(u8Result));
+    await fs.writeFile(`./bin/${len}-data.bin`, compressed);
+    await fs.writeFile(
+      `./bin/${len}-index.txt`,
+      resultMap.map((e) => e.length).join("\n")
+    );
+  } catch (e) {
+    console.error(e);
+  }
+};
