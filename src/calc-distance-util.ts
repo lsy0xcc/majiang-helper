@@ -1,3 +1,5 @@
+import { fromByteArray, toByteArray } from "base64-js";
+
 export const compareList = (a: number[], b: number[]) => {
   if (a.length !== b.length) {
     return b.length - a.length;
@@ -11,16 +13,18 @@ export const compareList = (a: number[], b: number[]) => {
   }
 };
 
-export const sheetToPattern = (input: number[][]) => {
+export const toSortedSheet = (input: number[][]) => {
   for (let i = 0; i < input.length; i++) {
     const reversed = [...input[i]].reverse();
     if (compareList(reversed, input[i]) < 0) {
       input[i] = reversed;
     }
   }
-  const sorted = input.sort(compareList);
-  // return sorted.map((list) => list.join(",")).join(" ");
-  return sorted
+  return input.sort(compareList);
+};
+
+export const sheetToPattern = (input: number[][]) => {
+  return toSortedSheet(input)
     .map((list) => list.join(","))
     .join(" ")
     .replaceAll(",0,", ";");
@@ -94,5 +98,63 @@ export const listToSheet = (input: number[]) => {
   if (tempArray.length) {
     result.push(tempArray);
   }
+  return result;
+};
+
+export const numberListToUInt8Array = (input: number[]) => {
+  const rest = (4 - (input.length % 4)) % 4;
+  for (let i = 0; i < rest; i++) {
+    input.push(0b00);
+  }
+  const u8Result: number[] = [];
+  for (let i = 0; i < input.length; i += 4) {
+    u8Result.push(
+      (input[i] << 6) | (input[i + 1] << 4) | (input[i + 2] << 2) | input[i + 3]
+    );
+  }
+  return new Uint8Array(u8Result);
+};
+
+export const sheetToBase64Pattern = (input: number[][]) => {
+  const result: number[] = [];
+  toSortedSheet(input).forEach((list) => {
+    let i = 0;
+    while (i < list.length - 1) {
+      result.push(list[i] - 1);
+      if (list[i + 1] > 0) {
+        result.push(0b00);
+        i += 1;
+      } else {
+        result.push(0b01);
+        i += 2;
+      }
+    }
+    result.push(list[list.length - 1] - 1);
+    result.push(0b10);
+  });
+  result[result.length - 1] = 0b11;
+  return fromByteArray(numberListToUInt8Array(result));
+};
+
+export const base64PatternToSheet = (input: string) => {
+  const result = [];
+  let list = [];
+  const numberList = [...toByteArray(input)]
+    .map((e) => [(e >> 6) & 0b11, (e >> 4) & 0b11, (e >> 2) & 0b11, e & 0b11])
+    .flat();
+  for (let i = 0; i < numberList.length; i += 2) {
+    const count = numberList[i];
+    const gap = numberList[i + 1];
+    list.push(count + 1);
+    if (gap === 1) {
+      list.push(0);
+    } else if (gap === 2) {
+      result.push(list);
+      list = [];
+    } else if (gap === 3) {
+      break;
+    }
+  }
+  result.push(list);
   return result;
 };

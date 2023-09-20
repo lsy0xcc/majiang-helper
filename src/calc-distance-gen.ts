@@ -1,7 +1,13 @@
+import { toByteArray } from "base64-js";
 import * as fs from "node:fs/promises";
-import { Worker } from "worker_threads";
-import { sheetToPattern } from "./calc-distance-util";
 import pako from "pako";
+import { Worker } from "worker_threads";
+import {
+  numberListToUInt8Array,
+  sheetToBase64Pattern,
+} from "./calc-distance-util";
+
+const len = 14;
 
 // decompose the input to a sum af a list of number
 const generateCount = (input: number, maxCount: number) => {
@@ -54,29 +60,6 @@ const pushNewGap = (prevList: number[][], type: number) => {
     .flat();
 };
 
-// return the map of all result, key is pattern and value is distance
-
-const generateResultMap = async (list: string[], processNo = 8) => {
-  const startTime = new Date().getTime();
-  // const total = list.length;
-  const oneWorkerLen = Math.ceil(list.length / processNo);
-  const workerResult = await Promise.all(
-    [...new Array(processNo).keys()].map((e) =>
-      runWorker({
-        data: list.slice(e * oneWorkerLen, (e + 1) * oneWorkerLen),
-        workerNo: e,
-      })
-    )
-  );
-  const resultArray = workerResult.flat();
-  console.log(
-    `\n${resultArray.length}generated in ${
-      (new Date().getTime() - startTime) / 1000
-    }s`
-  );
-  return resultArray.join("\n");
-};
-
 const generateResultSet = (len: number) => {
   console.log("generating");
   // { patternSum: 1292059, calcSum: 1058213 }
@@ -116,7 +99,7 @@ const generateResultSet = (len: number) => {
         (prev, curr) => prev && curr.length <= 9,
         true
       ); // if the list longer than 9, not a correct list
-      const pattern = sheetToPattern(result);
+      const pattern = sheetToBase64Pattern(result);
       if (isMoreThanMax && !set.has(pattern)) {
         set.add(pattern);
       }
@@ -126,38 +109,83 @@ const generateResultSet = (len: number) => {
   return set;
 };
 
-export const writeSetToFile = async () => {
-  // 87864ms
-  // 100176ms
-
-  try {
-    await fs.mkdir("./output");
-  } catch {}
-  try {
-    await fs.access(`./output/${len}-list.txt`);
-  } catch {
-    const resultSet = generateResultSet(len);
-    await fs.writeFile(`./output/${len}-list.txt`, [...resultSet].join("\n"));
+const generateResultMap = async (list: string[], processNo = 8) => {
+  const startTime = new Date().getTime();
+  const separated: string[][] = [];
+  for (let i = 0; i < processNo; i++) {
+    separated[i] = [];
   }
+  for (let i = 0; i < list.length; i++) {
+    separated[i % processNo].push(list[i]);
+  }
+  const workerResult = await Promise.all(
+    separated.map((e, i) => runWorker({ data: e, workerNo: i }))
+  );
+  const resultArray: string[] = [];
+  let x = 0;
+  let y = 0;
+  while (workerResult[x][y]) {
+    resultArray.push(workerResult[x][y]);
+    x = (x + 1) % processNo;
+    if (x === 0) {
+      y = y + 1;
+    }
+  }
+  console.log(
+    `\n${resultArray.length} generated in ${
+      (new Date().getTime() - startTime) / 1000
+    }s`
+  );
+  return resultArray;
 };
 
 export const writeDataToFile = async () => {
   const start = new Date();
-  let list: string[] = [];
-  try {
-    list = (await fs.readFile(`./output/${len}-list.txt`))
-      .toString()
-      .split("\n");
-  } catch {}
-
-  process.stdout.write(
+  const list: string[] = [...generateResultSet(len)];
+  console.log(
     `total:${list.length} ${
       (new Date().getTime() - start.getTime()) / 1000
     }s used`
   );
   const result = await generateResultMap(list);
+  generateBinFile(result);
+};
 
-  await fs.writeFile(`./output/${len}-data.txt`, result);
+export const generateBinFile = async (resultList: string[]) => {
+  const resultMap: string[][] = [];
+  // sort the list by distance
+  resultList.forEach((record) => {
+    const [pattern, distance] = record.split(">");
+    const distanceIndex = parseInt(distance);
+    if (resultMap[distanceIndex]) {
+      resultMap[distanceIndex].push(pattern);
+    } else {
+      resultMap[distanceIndex] = [pattern];
+    }
+  });
+  // convert the result
+  const resultArray: number[] = [];
+  resultMap.forEach((group) => {
+    group.forEach((pattern) => {
+      const patternArray = [...toByteArray(pattern)]
+        .map((e) => [
+          (e >> 6) & 0b11,
+          (e >> 4) & 0b11,
+          (e >> 2) & 0b11,
+          e & 0b11,
+        ])
+        .flat();
+      const lastIndex = patternArray.lastIndexOf(0b11);
+      const result = patternArray.slice(0, lastIndex + 1);
+      resultArray.push(...result);
+    });
+  });
+  const compressed = pako.deflate(numberListToUInt8Array(resultArray));
+  await fs.writeFile(`./bin/${len}-data.bin`, compressed);
+  await fs.writeFile(
+    `./bin/${len}-index.txt`,
+    resultMap.map((e) => e.length).join("\n")
+  );
 };
 
 const runWorker = async (workerData: { data: string[]; workerNo: number }) => {
@@ -181,76 +209,4 @@ const runWorker = async (workerData: { data: string[]; workerNo: number }) => {
       if (code !== 0) reject(new Error(`stopped with  ${code} exit code`));
     });
   });
-};
-
-const len = 14;
-
-export const generateBinFile = async () => {
-  try {
-    await fs.mkdir("./bin");
-  } catch {}
-  try {
-    await fs.access(`./output/${len}-data.txt`);
-    const textResult = await fs.readFile(`./output/${len}-data.txt`);
-    const resultMap: string[][] = [];
-    for (let i = 0; i <= 9; i++) {
-      resultMap[i] = [];
-    }
-
-    // sort the list  by diatance
-    textResult
-      .toString()
-      .split("\n")
-      .forEach((record) => {
-        const [pattern, distance] = record.split(">");
-        const distanceIndex = parseInt(distance);
-        resultMap[distanceIndex].push(pattern);
-      });
-
-    // convert the result
-    const resultArray: number[] = [];
-    resultMap.forEach((group) => {
-      group.forEach((pattern) => {
-        pattern.split("").forEach((char) => {
-          switch (char) {
-            case "1":
-            case ",":
-              resultArray.push(0);
-              break;
-            case "2":
-            case ";":
-              resultArray.push(1);
-              break;
-            case "3":
-            case " ":
-              resultArray.push(2);
-              break;
-            case "4":
-              resultArray.push(3);
-              break;
-          }
-        });
-        resultArray.push(3);
-      });
-    });
-    const u8Result: number[] = [];
-    const u8Length = resultArray.length / 4;
-    for (let i = 0; i < u8Length; i++) {
-      u8Result.push(
-        (resultArray[i] << 6) |
-          (resultArray[i + 1] << 4) |
-          (resultArray[i + 2] << 2) |
-          resultArray[i + 3]
-      );
-    }
-
-    const compressed = pako.deflate(new Uint8Array(u8Result));
-    await fs.writeFile(`./bin/${len}-data.bin`, compressed);
-    await fs.writeFile(
-      `./bin/${len}-index.txt`,
-      resultMap.map((e) => e.length).join("\n")
-    );
-  } catch (e) {
-    console.error(e);
-  }
 };
