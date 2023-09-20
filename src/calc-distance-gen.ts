@@ -148,7 +148,7 @@ export const writeDataToFile = async () => {
     }s used`
   );
   const result = await generateResultMap(list);
-  generateBinFile(result);
+  await generateBinFile(result);
 };
 
 export const generateBinFile = async (resultList: string[]) => {
@@ -181,11 +181,16 @@ export const generateBinFile = async (resultList: string[]) => {
     });
   });
   const compressed = pako.deflate(numberListToUInt8Array(resultArray));
-  await fs.writeFile(`./bin/${len}-data.bin`, compressed);
-  await fs.writeFile(
-    `./bin/${len}-index.txt`,
-    resultMap.map((e) => e.length).join("\n")
-  );
+  try {
+    await fs.mkdir("./bin");
+  } catch {}
+  try {
+    await fs.writeFile(`./bin/${len}-data.bin`, compressed);
+    await fs.writeFile(
+      `./bin/${len}-index.txt`,
+      resultMap.map((e) => e.length).join("\n")
+    );
+  } catch {}
 };
 
 const runWorker = async (workerData: { data: string[]; workerNo: number }) => {

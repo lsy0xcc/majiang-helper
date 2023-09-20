@@ -1,5 +1,5 @@
 import { parentPort, workerData } from "worker_threads";
-import { calcDistance } from "./calc-distance";
+import { calcDistanceSimple } from "./calc-distance-simple";
 import { base64PatternToSheet } from "./calc-distance-util";
 
 const generateResultMap = (list: string[], workerNo: number) => {
@@ -13,7 +13,7 @@ const generateResultMap = (list: string[], workerNo: number) => {
     const sheet: number[][] = base64PatternToSheet(pattern);
     if (!map.has(pattern)) {
       sum++;
-      map.set(pattern, calcDistance(sheet));
+      map.set(pattern, calcDistanceSimple(sheet));
     }
     if (sum % 1000 === 0) {
       const text = `worker#${workerNo}: ${sum}/${list.length} ${(
