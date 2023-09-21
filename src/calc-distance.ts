@@ -7,6 +7,7 @@ import {
 } from "./calc-distance-util";
 import { fromByteArray } from "base64-js";
 const len = 14;
+
 export const readFromFile = async () => {
   try {
     const resultList: number[][] = [];
@@ -31,44 +32,41 @@ export const readFromFile = async () => {
       .toString()
       .split("\n")
       .map((e) => parseInt(e));
-    const resultSetList: Set<String>[] = [];
+    const resultMapList: Map<String, number> = new Map();
     let currentIndex = 0;
-    for (let i = 0; i < countList.length; i++) {
-      resultSetList.push(new Set<string>());
-    }
+    let count = 0;
     patternList.forEach((e) => {
-      if (resultSetList[currentIndex].size >= countList[currentIndex]) {
+      if (count >= countList[currentIndex]) {
         currentIndex++;
+        count = 0;
       }
-      resultSetList[currentIndex].add(e);
+      count++;
+      resultMapList.set(e, currentIndex);
     });
 
-    return resultSetList;
+    return resultMapList;
   } catch (e) {
     console.error(e);
-    return [];
+    return new Map();
   }
 };
-export const searchDistance = async (
+const sum = (arr: number[]) => arr.reduce((prev, curr) => prev + curr);
+export const searchDistance = (
   input: string,
-  loadedData?: Set<String>[]
+  loadedData: Map<string, number>
 ) => {
+  if (!loadedData) {
+    return -1;
+  }
   const sheet = inputToSheet(input);
   if (!sheet?.length) {
     return -1;
   }
-  const sum = (arr: number[]) => arr.reduce((prev, curr) => prev + curr);
+
   const total = sum(sheet.map(sum));
   if (total % 3 !== 2) {
     return -1;
   }
   const pattern = sheetToBase64Pattern(sheet);
-
-  const mapData = loadedData ?? (await readFromFile());
-  for (let i = 0; i < mapData.length; i++) {
-    if (mapData[i].has(pattern)) {
-      return i;
-    }
-  }
-  return -1;
+  return loadedData.get(pattern) ?? -1;
 };

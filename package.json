@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc",
-    "test-run": "tsc && node ./dist/index.js"
+    "run": "node ./dist/index.js"
   },
   "author": "",
   "license": "ISC",
