@@ -39,43 +39,45 @@ export const patternToSheet = (pattern: string) => {
   );
 };
 
-export const inputToSheet = (input: string) =>
-  listToSheet(inputToList(input) ?? []);
+export const inputToSheet = (input: string) => listToSheet(inputToList(input));
 
 export const inputToList = (input: string) => {
   // [1m, ..., 9m, 0, 0, 1s, ..., 9s, 0, 0, 1p, ..., 9p, 0, 0, 1z, 0, 0, 2z, ...]
   const result = new Array(52).fill(0);
-  if (input.match(/(\d+[mpsz])+/)) {
-    [...input.matchAll(/\d+[mpsz]/g)]
-      .map((e) => e[0]) // split mpsz type
-      .forEach((e) => {
-        const list = e.split("");
-        const type = list.pop(); // get type
-        list
-          .map((e) => parseInt(e === "0" ? "5" : e)) // convert red 5
-          .forEach((e) => {
-            switch (type) {
-              case "m":
-                result[e - 1]++;
-                break;
-              case "s":
-                result[e + 10]++;
-                break;
-              case "p":
-                result[e + 21]++;
-                break;
-              case "z":
-                result[3 * (e + 10)]++;
-            }
-          });
-      });
-    if (
-      result.length <= 52 && // prevent 8z 9z
-      result.reduce((prev, curr) => prev && curr <= 4, true) // prevent more than 4 tiles
-    ) {
-      return result;
+  const matchResult = input.matchAll(/\d+[mpsz]/g);
+
+  for (let match of matchResult) {
+    const list = match[0].split("");
+    const type = list[list.length - 1]; // get type
+    for (let i = 0; i < list.length - 1; i++) {
+      const e = parseInt(list[i] === "0" ? "5" : list[i]);
+      switch (type) {
+        case "m":
+          result[e - 1]++;
+          break;
+        case "s":
+          result[e + 10]++;
+          break;
+        case "p":
+          result[e + 21]++;
+          break;
+        case "z":
+          result[3 * (e + 10)]++;
+      }
     }
   }
+
+  for (let i = 0; i < result.length; i++) {
+    if (i >= 52) {
+      // prevent 8z 9z
+      return [];
+    }
+    if (result[i] > 4) {
+      // prevent more than 4
+      return [];
+    }
+  }
+  return result;
 };
 
 export const listToSheet = (input: number[]) => {
@@ -106,32 +108,35 @@ export const numberListToUInt8Array = (input: number[]) => {
   for (let i = 0; i < rest; i++) {
     input.push(0b00);
   }
-  const u8Result: number[] = [];
+  const resultArray = new Uint8Array((input.length + rest) / 4);
   for (let i = 0; i < input.length; i += 4) {
-    u8Result.push(
-      (input[i] << 6) | (input[i + 1] << 4) | (input[i + 2] << 2) | input[i + 3]
-    );
+    resultArray[i >> 2] =
+      (input[i] << 6) |
+      (input[i + 1] << 4) |
+      (input[i + 2] << 2) |
+      input[i + 3];
   }
-  return new Uint8Array(u8Result);
+  return resultArray;
 };
 
 export const sheetToBase64Pattern = (input: number[][]) => {
   const result: number[] = [];
-  toSortedSheet(input).forEach((list) => {
-    let i = 0;
-    while (i < list.length - 1) {
-      result.push(list[i] - 1);
-      if (list[i + 1] > 0) {
+  const sortedSheet = toSortedSheet(input);
+  for (let i = 0; i < sortedSheet.length; i++) {
+    let j = 0;
+    while (j < sortedSheet[i].length - 1) {
+      result.push(sortedSheet[i][j] - 1);
+      if (sortedSheet[i][j + 1] > 0) {
         result.push(0b00);
-        i += 1;
+        j += 1;
       } else {
         result.push(0b01);
-        i += 2;
+        j += 2;
       }
     }
-    result.push(list[list.length - 1] - 1);
+    result.push(sortedSheet[i][sortedSheet[i].length - 1] - 1);
     result.push(0b10);
-  });
+  }
   result[result.length - 1] = 0b11;
   return fromByteArray(numberListToUInt8Array(result));
 };

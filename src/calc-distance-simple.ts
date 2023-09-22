@@ -1,7 +1,10 @@
+import { disconnect } from "process";
 import { listToSheet } from "./calc-distance-util";
 
-interface Record {
+interface Record extends RecordResult {
   sheet: number[][];
+}
+interface RecordResult {
   k: number;
   s: number;
   d: number;
@@ -27,7 +30,8 @@ export const calcDistanceSimple = (sheet?: number[][]) => {
     return -1;
   }
   const target = (total + 1) / 3;
-  return calc({
+  let min = Number.MAX_SAFE_INTEGER;
+  const calcResult = calc({
     sheet,
     k: 0,
     s: 0,
@@ -35,29 +39,26 @@ export const calcDistanceSimple = (sheet?: number[][]) => {
     l: 0,
     q: 0,
     target: target,
-  })
-    .map((e) => calcDistanceByRecord(e))
-    .reduce((prev, curr) => (prev > curr ? curr : prev));
-  // .map((e) => ({ distance: calcDistanceByRecord(e), ...e }))
-  // .reduce((prev, curr) => (prev.distance > curr.distance ? curr : prev))
+  });
+  for (let i = 0; i < calcResult.length; i++) {
+    const distance = calcDistanceByRecord(calcResult[i]);
+    if (distance < min) {
+      min = distance;
+    }
+  }
+  return min;
 };
 
 // calc the distance
-const calcDistanceByRecord = (input: {
-  k: number;
-  s: number;
-  d: number;
-  l: number;
-  q: number;
-  target: number;
-}) => {
+const calcDistanceByRecord = (input: RecordResult) => {
   const { s, k, d, l, q, target } = input;
   return (
     2 * target -
     1 -
     2 * (s + k) -
-    Math.min(d + l + q, target - 1 - s - k) -
-    (d > 0 ? 1 : 0)
+    (s + k + l + d + q >= target
+      ? target - s - k - (!d as unknown as number)
+      : d + l + q)
   );
 };
 

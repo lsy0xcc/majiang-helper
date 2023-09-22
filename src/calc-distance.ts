@@ -10,47 +10,43 @@ const len = 14;
 
 export const readFromFile = async () => {
   try {
-    const resultList: number[][] = [];
-    let tempList: number[] = [];
-    [...pako.inflate(await fs.readFile(`./bin/${len}-data.bin`))]
-      .map((e) => [
-        [(e >> 6) & 0b11, (e >> 4) & 0b11],
-        [(e >> 2) & 0b11, e & 0b11],
-      ])
-      .flat()
-      .forEach((e) => {
-        tempList.push(e[0], e[1]);
-        if (e[1] == 0b11) {
-          resultList.push(tempList);
-          tempList = [];
-        }
-      });
-    const patternList = resultList.map((e) =>
-      fromByteArray(numberListToUInt8Array(e))
-    );
+    const uint8Array = pako.inflate(await fs.readFile(`./bin/${len}-data.bin`));
     const countList = (await fs.readFile(`./bin/${len}-index.txt`))
       .toString()
       .split("\n")
       .map((e) => parseInt(e));
-    const resultMapList: Map<String, number> = new Map();
+    const resultMap: Map<String, number> = new Map();
     let currentIndex = 0;
-    let count = 0;
-    patternList.forEach((e) => {
-      if (count >= countList[currentIndex]) {
-        currentIndex++;
-        count = 0;
+    let indexCount = 0;
+    let temp: number[] = [];
+    for (let i = 0; i < uint8Array.length; i++) {
+      const byte = uint8Array[i];
+      for (let j = 0; j < 2; j++) {
+        const count = j ? (byte >> 2) & 0b11 : (byte >> 6) & 0b11;
+        const gap = j ? byte & 0b11 : (byte >> 4) & 0b11;
+        temp.push(count);
+        temp.push(gap);
+        if (gap === 0b11 && temp.length !== 0) {
+          if (indexCount >= countList[currentIndex]) {
+            currentIndex++;
+            indexCount = 0;
+          }
+          indexCount++;
+          resultMap.set(
+            fromByteArray(numberListToUInt8Array(temp)),
+            currentIndex
+          );
+          temp = [];
+        }
       }
-      count++;
-      resultMapList.set(e, currentIndex);
-    });
-
-    return resultMapList;
+    }
+    return resultMap;
   } catch (e) {
     console.error(e);
     return new Map();
   }
 };
-const sum = (arr: number[]) => arr.reduce((prev, curr) => prev + curr);
+
 export const searchDistance = (
   input: string,
   loadedData: Map<string, number>
@@ -63,7 +59,12 @@ export const searchDistance = (
     return -1;
   }
 
-  const total = sum(sheet.map(sum));
+  let total = 0;
+  for (let i = 0; i < sheet.length; i++) {
+    for (let j = 0; j < sheet[i].length; j++) {
+      total += sheet[i][j];
+    }
+  }
   if (total % 3 !== 2) {
     return -1;
   }

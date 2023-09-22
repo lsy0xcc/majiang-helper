@@ -1,23 +1,36 @@
+import { memoryUsage } from "node:process";
 import { readFromFile, searchDistance } from "./calc-distance";
-
 const run = async () => {
   console.time("load data");
   const loadedData = await readFromFile();
   console.timeEnd("load data");
-  console.time("search");
+  console.log(memoryUsage());
   const query = [
-    "12345z",
-    "12345670z",
+    "1234567z1p",
+    "12345567z",
+    "123467z12p",
+    "124578p12s",
+    "124578p11s",
+    "124578p12z",
+    "124577p12z",
     "11123456789990p",
     "22333445556667p",
     "33334445555p",
     "19m19s19p1234567z5p",
-    "19m19s19p12345677z",
+    "129m19s19p1234567z",
   ];
+  console.log(memoryUsage());
+  console.time("search");
   query.forEach((e, i) => {
     console.log(`#${i}\t${searchDistance(e, loadedData)}\t${e}`);
   });
   console.timeEnd("search");
+  // console.log("\n");
+  // console.time("calc");
+  // query.forEach((e, i) => {
+  //   console.log(`#${i}\t${calcDistanceSimple(inputToSheet(e))}\t${e}`);
+  // });
+  // console.timeEnd("calc");
+  // console.log(memoryUsage());
 };
-
 run();
