@@ -39,9 +39,10 @@ export const patternToSheet = (pattern: string) => {
   );
 };
 
-export const inputToSheet = (input: string) => listToSheet(inputToList(input));
+export const inputToSheet: (input: string) => number[][] = (input: string) =>
+  listToSheet(inputToList(input));
 
-export const inputToList = (input: string) => {
+export const inputToList: (input: string) => number[] = (input: string) => {
   // [1m, ..., 9m, 0, 0, 1s, ..., 9s, 0, 0, 1p, ..., 9p, 0, 0, 1z, 0, 0, 2z, ...]
   const result = new Array(52).fill(0);
   const matchResult = input.matchAll(/\d+[mpsz]/g);

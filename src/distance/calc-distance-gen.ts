@@ -63,7 +63,7 @@ const pushNewGap = (prevList: number[][], type: number) => {
 const generateResultSet = (len: number) => {
   console.log("generating");
   // { patternSum: 1292059, calcSum: 1058213 }
-  const allSmallerCount = [];
+  const allSmallerCount: number[] = [];
   let curr = 2;
   while (curr <= len) {
     allSmallerCount.push(curr);

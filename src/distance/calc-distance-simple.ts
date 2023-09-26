@@ -1,7 +1,6 @@
-import { disconnect } from "process";
 import { listToSheet } from "./calc-distance-util";
 
-interface Record extends RecordResult {
+interface DistanceRecord extends RecordResult {
   sheet: number[][];
 }
 interface RecordResult {
@@ -63,7 +62,9 @@ const calcDistanceByRecord = (input: RecordResult) => {
 };
 
 // calculate
-const calc: (input: Record) => Record[] = (input: Record) => {
+const calc: (input: DistanceRecord) => DistanceRecord[] = (
+  input: DistanceRecord
+) => {
   if (input.k + input.s + input.d + input.l + input.q >= input.target) {
     return [input];
   }
@@ -82,8 +83,8 @@ const calc: (input: Record) => Record[] = (input: Record) => {
     : [input];
 };
 
-const minusK = (input: Record) => {
-  const result: Record[] = [];
+const minusK = (input: DistanceRecord) => {
+  const result: DistanceRecord[] = [];
   input.sheet.forEach((line, lineIndex) => {
     line.forEach((item, itemIndex) => {
       if (item >= 3) {
@@ -99,8 +100,8 @@ const minusK = (input: Record) => {
   });
   return result;
 };
-const minusS = (input: Record) => {
-  const result: Record[] = [];
+const minusS = (input: DistanceRecord) => {
+  const result: DistanceRecord[] = [];
   input.sheet.forEach((line, lineIndex) => {
     line.forEach((_item, itemIndex) => {
       if (line[itemIndex] && line[itemIndex + 1] && line[itemIndex + 2]) {
@@ -120,8 +121,8 @@ const minusS = (input: Record) => {
   });
   return result;
 };
-const minusD = (input: Record) => {
-  const result: Record[] = [];
+const minusD = (input: DistanceRecord) => {
+  const result: DistanceRecord[] = [];
   input.sheet.forEach((line, lineIndex) => {
     line.forEach((item, itemIndex) => {
       if (item >= 2) {
@@ -137,8 +138,8 @@ const minusD = (input: Record) => {
   });
   return result;
 };
-const minusL = (input: Record) => {
-  const result: Record[] = [];
+const minusL = (input: DistanceRecord) => {
+  const result: DistanceRecord[] = [];
   input.sheet.forEach((line, lineIndex) => {
     line.forEach((_item, itemIndex) => {
       if (line[itemIndex] && line[itemIndex + 1]) {
@@ -156,8 +157,8 @@ const minusL = (input: Record) => {
   });
   return result;
 };
-const minusQ = (input: Record) => {
-  const result: Record[] = [];
+const minusQ = (input: DistanceRecord) => {
+  const result: DistanceRecord[] = [];
   input.sheet.forEach((line, lineIndex) => {
     line.forEach((_item, itemIndex) => {
       if (line[itemIndex] && line[itemIndex + 2]) {
