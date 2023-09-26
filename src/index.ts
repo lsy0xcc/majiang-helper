@@ -1,5 +1,7 @@
 import { memoryUsage } from "node:process";
 import { readFromFile, searchDistance } from "./distance/calc-distance";
+import { generateCompleteMap } from "./complete/complete-gen";
+import { searchCompleteResult } from "./complete/complete";
 const run = async () => {
   console.time("load data");
   const loadedData = await readFromFile();
@@ -33,4 +35,10 @@ const run = async () => {
   // console.timeEnd("calc");
   // console.log(memoryUsage());
 };
-run();
+// run();
+const run2 = async () => {
+  const map = await generateCompleteMap();
+  const result = searchCompleteResult("22333444555666p", map);
+  console.log(JSON.stringify(result));
+};
+run2();
